@@ -1,1 +1,0 @@
-SELECT top(100 )  AccountStatus  from  nystart.LoanPortfolio
