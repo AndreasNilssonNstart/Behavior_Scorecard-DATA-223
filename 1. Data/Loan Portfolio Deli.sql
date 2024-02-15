@@ -1,24 +1,30 @@
-IF OBJECT_ID('tempdb..#deli') is not null
-	DROP TABLE #deli
-select SnapshotDate,
-	   A.SSN,
-	   max(case when DelinquencyStatusCode=9 then 9 
-	   when NumberOfLateStatements>=5 then 5 else DelinquencyStatusCode end) Delinquency,
-	   MAX(case when PFM.AccountNumber is not null then 1 else 0 end) as FBE,
-	   SUM(CurrentAmount) as Balance,
-	   IsMonthEnd
-into #deli
-from nystart.LoanPortfolio LP
-join  nystart.Applications A
-on A.AccountNumber=LP.AccountNumber and A.DisbursedDate=LP.DisbursedDate
-left join nystart.PaymentFreeMonths PFM
-on LP.AccountNumber=PFM.AccountNumber and YEAR(LP.SnapshotDate)*100+Month(LP.SnapshotDate)=YearMonth
-left join nystart.DateDim DD on LP.SnapshotDate=DD.Date
-group by SnapshotDate,SSN,IsMOnthEnd;
-​
-CREATE CLUSTERED INDEX idx1 on #deli(SnapshotDate,SSN)
-IF OBJECT_ID('tempdb..#deli1') is not null
-	DROP TABLE #deli1
+
+WITH DelinquencyInfo AS (
+    SELECT
+        LP.SnapshotDate,
+        A.SSN,
+        MAX(CASE
+            WHEN DelinquencyStatusCode = 9 THEN 9 
+            WHEN NumberOfLateStatements >= 5 THEN 5 
+            ELSE DelinquencyStatusCode
+        END) AS Delinquency,
+        MAX(CASE
+            WHEN PFM.AccountNumber IS NOT NULL THEN 1
+            ELSE 0
+        END) AS FBE,
+        SUM(LP.CurrentAmount) AS Balance,
+        DD.IsMonthEnd
+    FROM nystart.LoanPortfolio LP
+    JOIN nystart.Applications A ON A.AccountNumber = LP.AccountNumber AND A.DisbursedDate = LP.DisbursedDate
+    LEFT JOIN nystart.PaymentFreeMonths PFM ON LP.AccountNumber = PFM.AccountNumber 
+                                             AND YEAR(LP.SnapshotDate) * 100 + MONTH(LP.SnapshotDate) = PFM.YearMonth
+    LEFT JOIN nystart.DateDim DD ON LP.SnapshotDate = DD.Date
+    WHERE LP.SnapshotDate > DATEADD(MONTH, -3, GETDATE())
+    GROUP BY LP.SnapshotDate, A.SSN, DD.IsMonthEnd
+),
+
+deli1 as (
+
 select *,
 	   MAX(case when Delinquency=1 then  SnapshotDate else null end) over (partition by SSN order by SnapshotDate rows between unbounded preceding and current row) as Last1DateE,
 	   MAX(case when Delinquency=2 then  SnapshotDate else null end) over (partition by SSN order by SnapshotDate rows between unbounded preceding and current row) as Last30DateE,
@@ -35,15 +41,15 @@ select *,
 	   Min(case when Delinquency>3 then  SnapshotDate else null end) over (partition by SSN order by SnapshotDate rows between 1 following and unbounded following) as Next90Date,
 	   Min(case when Delinquency>4 then  SnapshotDate else null end) over (partition by SSN order by SnapshotDate rows between 1 following and unbounded following) as Next120Date,
 	   Min(case when Delinquency=9 then  SnapshotDate else null end) over (partition by SSN order by SnapshotDate rows between 1 following and unbounded following) as NextFrozenDate,
-	   Min(case when FBE=1 then SnapshotDate else null end) over (partition by SSN order by SnapshotDate rows between 1 following and unbounded following) as NextFBEDate
+	   Min(case when FBE=1 then SnapshotDate else null end) over (partition by SSN order by SnapshotDate rows between 1 following and unbounded following) as NextFBEDate  --
 ​
-into #deli1
-from #deli
-create clustered index ci_ssn_dt on #deli1 (SSN,SnapshotDate)
-​
-​
-if OBJECT_ID('tempdb..#deliFinal2') is not null
-	DROP TABLE #deliFinal2
+
+from DelinquencyInfo ) 
+
+,
+
+
+deliFinal2  as (
 select d1.*,
 	   datediff(DAY,d1.Last30DateE,d1.SnapshotDate) as TimeSince30,
 	   datediff(DAY,d1.Last60DateE,d1.SnapshotDate) as TimeSince60,
@@ -86,7 +92,7 @@ select d1.*,
 	   case when DATEADD(month,6,d1.LastFBEDate)>=d1.SnapshotDate then 1 else 0 end as EverFBEIn6Months,
 	   case when DATEADD(month,12,d1.LastFBEDate)>=d1.SnapshotDate then 1 else 0 end as EverFBEIn12Months,
 	   case when DATEADD(month,24,d1.LastFBEDate)>=d1.SnapshotDate then 1 else 0 end as EverFBEIn24Months,
-	   case when DATEADD(month,36,d1.LastFBEDate)>=d1.SnapshotDate then 1 else 0 end as EverFBEIn36Months,
+	   case when DATEADD(month,36,d1.LastFBEDate)>=d1.SnapshotDate then 1 else 0 end as EverFBEIn36Months, --
 	   case when DATEADD(month,48,d1.LastFBEDate)>=d1.SnapshotDate then 1 else 0 end as EverFBEIn48Months,
 	   case when d1.LastFBEDate is not null then 1 else 0 end as EverFBE,
 	   case when d1.Next30Date<= DATEADD(year,1,d1.SnapshotDate) then 1 else 0 end as Ever30After12Months,
@@ -109,43 +115,48 @@ select d1.*,
 	   case when d1.NextFrozenDate<= DATEADD(year,2,d1.SnapshotDate) then 1 else 0 end as FrozenAfter24Months,
 	   case when d1.NextFrozenDate<= DATEADD(year,3,d1.SnapshotDate) then 1 else 0 end as FrozenAfter36Months,
 	   case when d1.NextFrozenDate<= DATEADD(year,4,d1.SnapshotDate) then 1 else 0 end as FrozenAfter48Months
-into #deliFinal2
-from #deli1 d1
-where IsMonthEnd=1
-create clustered index ci_ssn_dt on #deliFinal2 (SSN,SnapshotDate)
-​
-​
-if OBJECT_ID('tempdb..#deliFinal1') is not null
-	DROP TABLE #deliFinal1
+
+from deli1 d1
+where IsMonthEnd=1 ) 
+
+,
+
+deliFinal1 as (
+
 select d1.*,
 	  
 	   d30.Balance as ExposureAtFirst30,
 	   d60.Balance as ExposureAtFirst60,
 	   df.Balance as ExposureAtFirstFrozen
-into #deliFinal1
-from #deliFinal2 d1
-left join #deli1 d30 on  d1.SSN=d30.SSN and d30.SnapshotDate=d1.Next30Date
-left join #deli1 d60 on  d1.SSN=d60.SSN and d60.SnapshotDate=d1.Next60Date
+
+from deliFinal2 d1
+
+left join deli1 d30 on  d1.SSN=d30.SSN and d30.SnapshotDate=d1.Next30Date
+left join deli1 d60 on  d1.SSN=d60.SSN and d60.SnapshotDate=d1.Next60Date
 --left join #deli1 d90 on  d1.SSN=d90.SSN and d90.SnapshotDate=d1.Next90Date
 --left join #deli1 d120 on  d1.SSN=d120.SSN and d120.SnapshotDate=d1.Next120Date
-left join #deli1 df on  d1.SSN=df.SSN and df.SnapshotDate=d1.NextFrozenDate
-create clustered index ci_ssn_dt on #deliFinal1 (SSN,SnapshotDate)
-​
-​
-​
-if OBJECT_ID('tempdb..#deliFinal') is not null
-	DROP TABLE #deliFinal
+left join deli1 df on  d1.SSN=df.SSN and df.SnapshotDate=d1.NextFrozenDate
+
+),
+
+deliFinal as (
+
+
 select d1.*,
 	   d90.Balance as ExposureAtFirst90,
 	   d120.Balance as ExposureAtFirst120
-into #deliFinal
-from #deliFinal1 d1
-left join #deli1 d90 on  d1.SSN=d90.SSN and d90.SnapshotDate=d1.Next90Date
-left join #deli1 d120 on  d1.SSN=d120.SSN and d120.SnapshotDate=d1.Next120Date
-​
-​
-IF OBJECT_ID('tempdb..#base') is not null
-	DROP TABLE #base
+
+
+from deliFinal1 d1
+left join deli1 d90 on  d1.SSN=d90.SSN and d90.SnapshotDate=d1.Next90Date
+left join deli1 d120 on  d1.SSN=d120.SSN and d120.SnapshotDate=d1.Next120Date
+
+
+​) 
+,
+
+base1	as (
+
 select LP.SnapshotDate,
 	   D.IsMonthEnd,
 	   LP.AccountNumber,
@@ -219,43 +230,19 @@ select LP.SnapshotDate,
 	  ExposureAtFirst120,
 	  ExposureAtFirstFrozen
 
-into #base1	   
+base1	   
 from nystart.LoanPortfolio LP
 join  nystart.Applications A
 on A.AccountNumber=LP.AccountNumber and A.DisbursedDate=LP.DisbursedDate
 left join nystart.PaymentFreeMonths PFM
 on LP.AccountNumber=PFM.AccountNumber and YEAR(LP.SnapshotDate)*100+Month(LP.SnapshotDate)=YearMonth
 join nystart.DateDim D on D.Date=LP.SnapshotDate and IsMonthEnd=1
-join #deliFinal dF on dF.SSN=A.SSN and LP.SnapshotDate=dF.SnapshotDate
-drop table #base
+join deliFinal dF on dF.SSN=A.SSN and LP.SnapshotDate=dF.SnapshotDate
 
-
+)
 
 
 select b.*,cs.Score,cs.RiskClass
-into #base 
-from #base1 b
+
+from base1 b
 left join nystart.CustomerScore cs on cs.AccountNumber=b.AccountNumber and cs.SnapshotDate=b.SnapshotDate
-
-
-​
-update #base set Ever30After12Months=-1 where DATEDIFF(month,SnapshotDate,'2023-10-31')<12
-update #base set Ever60After12Months=-1 where DATEDIFF(month,SnapshotDate,'2023-10-31')<12
-update #base set Ever90After12Months=-1 where DATEDIFF(month,SnapshotDate,'2023-10-31')<12
-update #base set FrozenAfter12Months=-1 where DATEDIFF(month,SnapshotDate,'2023-10-31')<12
-update #base set Ever30After24Months=-1 where DATEDIFF(month,SnapshotDate,'2023-10-31')<24
-update #base set Ever60After24Months=-1 where DATEDIFF(month,SnapshotDate,'2023-10-31')<24
-update #base set Ever90After24Months=-1 where DATEDIFF(month,SnapshotDate,'2023-10-31')<24
-update #base set FrozenAfter24Months=-1 where DATEDIFF(month,SnapshotDate,'2023-10-31')<24
-update #base set Ever30After36Months=-1 where DATEDIFF(month,SnapshotDate,'2023-10-31')<36
-update #base set Ever60After36Months=-1 where DATEDIFF(month,SnapshotDate,'2023-10-31')<36
-update #base set Ever90After36Months=-1 where DATEDIFF(month,SnapshotDate,'2023-10-31')<36
-update #base set FrozenAfter36Months=-1 where DATEDIFF(month,SnapshotDate,'2023-10-31')<36
-update #base set Ever30After48Months=-1 where DATEDIFF(month,SnapshotDate,'2023-10-31')<48
-update #base set Ever60After48Months=-1 where DATEDIFF(month,SnapshotDate,'2023-10-31')<48
-update #base set Ever90After48Months=-1 where DATEDIFF(month,SnapshotDate,'2023-10-31')<48
-update #base set FrozenAfter48Months=-1 where DATEDIFF(month,SnapshotDate,'2023-10-31')<48
-​
-select * from #base
-​
---​where AccountNumber = '5544507'

@@ -15,7 +15,7 @@ left join nystart.PaymentFreeMonths PFM
 on LP.AccountNumber=PFM.AccountNumber and YEAR(LP.SnapshotDate)*100+Month(LP.SnapshotDate)=YearMonth
 left join nystart.DateDim DD on LP.SnapshotDate=DD.Date
 
-WHERE SnapshotDate > DATEADD(MONTH, -7, GETDATE())
+WHERE SnapshotDate > DATEADD(MONTH, -1, GETDATE())
 
 
 group by SnapshotDate,SSN,IsMOnthEnd;
@@ -43,6 +43,7 @@ select *,
 ​
 into #deli1
 from #deli
+
 create clustered index ci_ssn_dt on #deli1 (SSN,SnapshotDate)
 ​
 ​
@@ -232,7 +233,7 @@ left join nystart.PaymentFreeMonths PFM
 on LP.AccountNumber=PFM.AccountNumber and YEAR(LP.SnapshotDate)*100+Month(LP.SnapshotDate)=YearMonth
 join nystart.DateDim D on D.Date=LP.SnapshotDate and IsMonthEnd=1
 join #deliFinal dF on dF.SSN=A.SSN and LP.SnapshotDate=dF.SnapshotDate
---drop table #base
+
 
 
 
@@ -242,28 +243,4 @@ into #base
 from #base1 b
 left join nystart.CustomerScore cs on cs.AccountNumber=b.AccountNumber and cs.SnapshotDate=b.SnapshotDate
 
-
-
-
-​
--- update #base set Ever30After12Months=-1 where DATEDIFF(month,SnapshotDate,'2023-10-31')<12
--- update #base set Ever60After12Months=-1 where DATEDIFF(month,SnapshotDate,'2023-10-31')<12
--- update #base set Ever90After12Months=-1 where DATEDIFF(month,SnapshotDate,'2023-10-31')<12
--- update #base set FrozenAfter12Months=-1 where DATEDIFF(month,SnapshotDate,'2023-10-31')<12
--- update #base set Ever30After24Months=-1 where DATEDIFF(month,SnapshotDate,'2023-10-31')<24
--- update #base set Ever60After24Months=-1 where DATEDIFF(month,SnapshotDate,'2023-10-31')<24
--- update #base set Ever90After24Months=-1 where DATEDIFF(month,SnapshotDate,'2023-10-31')<24
--- update #base set FrozenAfter24Months=-1 where DATEDIFF(month,SnapshotDate,'2023-10-31')<24
--- update #base set Ever30After36Months=-1 where DATEDIFF(month,SnapshotDate,'2023-10-31')<36
--- update #base set Ever60After36Months=-1 where DATEDIFF(month,SnapshotDate,'2023-10-31')<36
--- update #base set Ever90After36Months=-1 where DATEDIFF(month,SnapshotDate,'2023-10-31')<36
--- update #base set FrozenAfter36Months=-1 where DATEDIFF(month,SnapshotDate,'2023-10-31')<36
--- update #base set Ever30After48Months=-1 where DATEDIFF(month,SnapshotDate,'2023-10-31')<48
--- update #base set Ever60After48Months=-1 where DATEDIFF(month,SnapshotDate,'2023-10-31')<48
--- update #base set Ever90After48Months=-1 where DATEDIFF(month,SnapshotDate,'2023-10-31')<48
--- update #base set FrozenAfter48Months=-1 where DATEDIFF(month,SnapshotDate,'2023-10-31')<48
-​
 select * from #base
-​
---where AccountNumber = '5544507'
-​
