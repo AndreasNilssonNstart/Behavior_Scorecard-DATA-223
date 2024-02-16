@@ -15,6 +15,8 @@ left join nystart.PaymentFreeMonths PFM
 on LP.AccountNumber=PFM.AccountNumber and YEAR(LP.SnapshotDate)*100+Month(LP.SnapshotDate)=YearMonth
 left join nystart.DateDim DD on LP.SnapshotDate=DD.Date
 
+
+-- For SCORE Card modelling we shall not filter on date...
 WHERE SnapshotDate > DATEADD(MONTH, -1, GETDATE())
 
 

@@ -1,5 +1,7 @@
 
-WITH DelinquencyInfo AS (
+WITH  DelinquencyInfo AS 
+
+(
     SELECT
         LP.SnapshotDate,
         A.SSN,
@@ -19,7 +21,7 @@ WITH DelinquencyInfo AS (
     LEFT JOIN nystart.PaymentFreeMonths PFM ON LP.AccountNumber = PFM.AccountNumber 
                                              AND YEAR(LP.SnapshotDate) * 100 + MONTH(LP.SnapshotDate) = PFM.YearMonth
     LEFT JOIN nystart.DateDim DD ON LP.SnapshotDate = DD.Date
-    WHERE LP.SnapshotDate > DATEADD(MONTH, -3, GETDATE())
+    WHERE LP.SnapshotDate > DATEADD(MONTH, -6, GETDATE())    --and LP.AccountNumber =7798630
     GROUP BY LP.SnapshotDate, A.SSN, DD.IsMonthEnd
 ),
 
@@ -239,10 +241,57 @@ on LP.AccountNumber=PFM.AccountNumber and YEAR(LP.SnapshotDate)*100+Month(LP.Sna
 join nystart.DateDim D on D.Date=LP.SnapshotDate and IsMonthEnd=1
 join deliFinal dF on dF.SSN=A.SSN and LP.SnapshotDate=dF.SnapshotDate
 
+) ,
+
+
+
+LatestStatus AS (
+    SELECT 
+        AccountNumber, 
+        MAX(StartDate) AS LastStartDate
+    FROM 
+        [Reporting-db].[nystart].[Forbearance]
+    WHERE 
+        ForbearanceName NOT IN ('Skip a pay', '')
+    GROUP BY 
+        AccountNumber
 )
+,
+
+LatestForberanceStatus as (
+
+SELECT f.AccountNumber, f.StartDate as forberanceDate
+
+FROM 
+    [Reporting-db].[nystart].[Forbearance] AS f
+INNER JOIN 
+    LatestStatus AS l ON f.AccountNumber = l.AccountNumber AND f.StartDate = l.LastStartDate
+WHERE 
+    f.ForbearanceName NOT IN ('Skip a pay', '')
+
+) , 
+
+
+ForberanceLogic as (  
+
+
+SELECT b.*, 
+       l.forberanceDate,
+       CASE WHEN DATEADD(month, 3, l.forberanceDate) > b.SnapshotDate AND b.SnapshotDate >= l.forberanceDate THEN 1 ELSE 0 END as ForberanceIn3Months,
+       CASE WHEN DATEADD(month, 6, l.forberanceDate) > b.SnapshotDate AND b.SnapshotDate >= l.forberanceDate THEN 1 ELSE 0 END as ForberanceIn6Months,
+       CASE WHEN DATEADD(month, 9, l.forberanceDate) > b.SnapshotDate AND b.SnapshotDate >= l.forberanceDate THEN 1 ELSE 0 END as ForberanceIn9Months,
+       CASE WHEN DATEADD(month, 12, l.forberanceDate) > b.SnapshotDate AND b.SnapshotDate >= l.forberanceDate THEN 1 ELSE 0 END as ForberanceIn12Months
+FROM base1 as b
+LEFT JOIN LatestForberanceStatus as l ON b.AccountNumber = l.AccountNumber
+
+
+)
+
 
 
 select b.*,cs.Score,cs.RiskClass
 
-from base1 b
+from ForberanceLogic b
 left join nystart.CustomerScore cs on cs.AccountNumber=b.AccountNumber and cs.SnapshotDate=b.SnapshotDate
+
+order by b.CoappFlag , b.MOB
