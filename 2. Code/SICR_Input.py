@@ -1,42 +1,74 @@
 import pandas as pd
 import numpy as np
-import datetime
+import datetime as dt
 import os
 
+import warnings
+warnings.filterwarnings('ignore')
 
 
 
 ################### GET PAYMENT DATA ##########################
 
+path = "/Users/andreasnilsson/Library/CloudStorage/OneDrive-Nstart/Skrivbordet/Repository Homes/Behavior_Scorecard-DATA-223/2. Code/Classes"
+os.chdir(path)
 
-from Preprocessing_Application import DataPreprocessor
+from Preprocessing_Application_N import DataPreprocessor
+
+
 
 server = 'reporting-db.nystartfinans.net'
 database = 'reporting-db'
 username = 'Andreas'
 password = 'nCq8Sg@1lYnd(E'
+driver = '{ODBC Driver 17 for SQL Server}'  # This is an example for SQL Server, adjust according to your database and installed ODBC driver
 
-path = "/Users/andreasnilsson/Library/CloudStorage/OneDrive-Nstart/Skrivbordet/Repository Homes/Behaviour-ScoreCard-DATA-223-/1. Data/1. BSD copy .sql"
+# Initialize DataPreprocessor with all required parameters, including the driver
+processor = DataPreprocessor(server, database, username, password, driver)
 
-preprocessor = DataPreprocessor(server, database, username, password) 
-
-df = preprocessor.fetch_data_from_sql(path)
+path = "/Users/andreasnilsson/Library/CloudStorage/OneDrive-Nstart/Skrivbordet/Repository Homes/Behavior_Scorecard-DATA-223/1. Data/Loan Portfolio Deli.sql"
 
 
+df = processor.fetch_data_from_sql(path)
 
 
 
 main = df[df.CoappFlag == 0]
+
 co = df[df.CoappFlag == 1]
 
 main = main[~main.AccountNumber.isin(co.AccountNumber)]
+
 df = pd.concat([main,co])
+
+df = df[df.AccountStatus.isin(['OPEN','FROZEN','COLLECTION'])]
+
+
+
+
+
+################### IMPORT MACRO INSTRUMENT DATA ##########################
+
+
+path = "/Users/andreasnilsson/Library/CloudStorage/OneDrive-Nstart/Skrivbordet/Repository Homes/Behavior_Scorecard-DATA-223/1. Data"
+os.chdir(path)
+
+MacroInstrument = pd.read_excel('Macro_Instrument.xlsx')
+
+#df.to_csv('BSC_Today.csv', index=False)
+
+MacroInstrument = MacroInstrument[['Date','Instrument Rolling Mean']]
+MacroInstrument['Instrument Rolling Mean'] = np.where(MacroInstrument['Instrument Rolling Mean'].notna(), MacroInstrument['Instrument Rolling Mean'],1 )    ## Will have 1 if NAN but this shall be updated each month 
+MacroInstrument['Date'] =  MacroInstrument['Date'].astype(str)
+MacroInstrument
+
+
 
 
 
 
 #######################   CALCULATE BEHVAIOUR MODEL         ##################################
-
+print('hej1')
 
 coefficients = np.array([-0.44414603,  0.18778622 , 0.3539554 ,  0.70178643])
 intercept = np.array([0])
@@ -72,7 +104,9 @@ pd_['Z_calibrated'] = pd_['P'].apply(lambda x: x * calibration_coef + calibratio
 pd_['BehaviourModel'] = pd_['Z_calibrated'].apply(lambda x: 1 / (1 + np.exp(-x)))
 
 
-pd_ = pd_[['AccountNumber','AccountStatus','SnapshotDate',	'MOB'	,'DisbursedDate',	'CurrentAmount','RemainingTenor','CoappFlag',	'Ever30In6Months',	'WorstDelinquency6M','CurrentDelinquencyStatus','WorstDelinquency12M','Ever30In12Months','Ever90In12Months'	,'Score'	,'RiskClass','P','BehaviourModel','Ever90']]
+pd_ = pd_[['AccountNumber','AccountStatus','SnapshotDate',	'MOB'	,'DisbursedDate',	'CurrentAmount','RemainingTenor','CoappFlag',	'Ever30In6Months',	'WorstDelinquency6M','CurrentDelinquencyStatus','WorstDelinquency12M','Ever30In12Months','Ever90In12Months'	,'Score'	,'RiskClass','P','BehaviourModel','Ever90','ForberanceIn6Months','ForberanceIn12Months']]
+pd_.loc[:, 'DisbursedDate'] = pd.to_datetime(pd_['DisbursedDate'])
+
 
 BehaviourDone = pd_.copy()
 
@@ -80,52 +114,43 @@ BehaviourDone = pd_.copy()
 
 
 
-
+print('hej2')
 #######################         CALCULATE ADMISSION MODEL         ##################################
-
-path = '/Users/andreasnilsson/Library/CloudStorage/OneDrive-Nstart/Skrivbordet/Repository Homes/Admission-Scorecard-DATA-196/Codes'
-
-# Change the current working directory
-os.chdir(path)
-
-from Preprocessing import DataPreprocessor
-
-
-path = '/Users/andreasnilsson/Library/CloudStorage/OneDrive-Nstart/Skrivbordet/Repository Homes/Admission-Scorecard-DATA-196/DATA'
-
-
-server = 'reporting-db.nystartfinans.net'
-database = 'reporting-db'
-username = 'Andreas'
-password = 'nCq8Sg@1lYnd(E'
 
 main_path = "/Users/andreasnilsson/Library/CloudStorage/OneDrive-Nstart/Skrivbordet/Repository Homes/Admission-Scorecard-DATA-196/DATA/MA Correct join - APL CRB-MLP Today.sql"
 co_path = "/Users/andreasnilsson/Library/CloudStorage/OneDrive-Nstart/Skrivbordet/Repository Homes/Admission-Scorecard-DATA-196/DATA/CO Min score join - APL CBR MLP Today.sql"
 
-preprocessor = DataPreprocessor(server, database, username, password)
+preprocessor = DataPreprocessor(server, database, username, password,driver)
 final_df = preprocessor.process_data(main_path, co_path)
 
 
-pd_ = final_df[['SSN','UCScore','age' ,'Inquiries12M','UtilizationRatio','Amount','MaritalStatus','ReceivedDate','DisbursedDate','Applicationtype','Ever90','Ever30','AccountNumber','CapitalDeficit','PropertyVolume','PaymentRemarks','IndebtednessRatio','ApplicationScore', 'StartupFee','PaymentRemarksNo'] ]
+pd_ = final_df[['SSN','PDScoreNew','UCScore','age' ,'Inquiries12M','UtilizationRatio','Amount','MaritalStatus','ReceivedDate','DisbursedDate','Applicationtype','Ever90','Ever30','AccountNumber','CapitalDeficit','PropertyVolume','PaymentRemarks','IndebtednessRatio','ApplicationScore', 'StartupFee','PaymentRemarksNo'] ]
 
 
 
 
 
+# Assuming pd_ is your DataFrame and it's already defined
 
-
-# Get the current date  to only include reporting month
-now = datetime.datetime.now()
+# Get the current date
+now = dt.datetime.now()
 
 # Get the first day of the current month
-first_day_of_month = datetime.datetime(now.year, now.month, 1)
+first_day_of_month = dt.datetime(now.year, now.month, 1)
+
+# Ensure 'DisbursedDate' is in datetime format if it's not already
+pd_.loc[:, 'DisbursedDate'] = pd.to_datetime(pd_['DisbursedDate'])
+
 
 # Filter the DataFrame for rows where 'DisbursedDate' is less than the first day of the current month
 pd_ = pd_[pd_['DisbursedDate'] < first_day_of_month]
 
+# Print the maximum 'DisbursedDate' from the filtered DataFrame
+print(pd_['DisbursedDate'].max())
 
 
 
+print('hej3')
 
 
 # Coefficients and Intercept from the Logistic Regression model
@@ -160,103 +185,119 @@ pd_['Z_calibrated'] = pd_['P'].apply(lambda x: x * calibration_coef + calibratio
 pd_['AdmissionModel'] = pd_['Z_calibrated'].apply(lambda x: 1 / (1 + np.exp(-x)))
 
 
-AdmissionDone = pd_[['AccountNumber','UCScore','age','Inquiries12M','PropertyVolume','AdmissionModel','ApplicationScore']]
-AdmissionDone['AccountNumber'] = AdmissionDone['AccountNumber'].astype(int)
+AdmissionDone = pd_[['AccountNumber','PDScoreNew','UCScore','age','Inquiries12M','PropertyVolume','AdmissionModel','ApplicationScore']]
+AdmissionDone['AccountNumber'] = AdmissionDone['AccountNumber'] #.astype(int)
+
+print(type(AdmissionDone['AccountNumber']))
+print(type(BehaviourDone['AccountNumber']))
 
 
-
-
-
+print('hej4')
 #######################         CREATE SICR LOGIC         ##################################
 
 
-together = pd.merge(BehaviourDone,AdmissionDone , on='AccountNumber', how='outer')
+AdmissionDone = pd_[['AccountNumber','PDScoreNew','UCScore','age','Inquiries12M','PropertyVolume','AdmissionModel','ApplicationScore']]
+AdmissionDone['AccountNumber'] = AdmissionDone['AccountNumber'] # .astype(int)
 
-
+together = pd.merge(BehaviourDone,AdmissionDone , on='AccountNumber', how='left')
 
 
 ## Only OPEN & FROZEN ACCOUNTS
-lek = together[(together.AccountStatus.isin(['OPEN','FROZEN']) )& (together.SnapshotDate == max(together.SnapshotDate) )]
-
-
-lek = together.copy()
-lek = lek[(lek.AccountStatus.isin(['OPEN','FROZEN']) )]
+lek = together[ (together.SnapshotDate == max(together.SnapshotDate) )]
 
 
 
 
-lek['AppliedScore'] = np.where(  (lek.MOB < 3) & (lek.DisbursedDate > '2023-12-20') ,lek.AdmissionModel ,
-                      np.where(  (lek.MOB < 3) & (lek.DisbursedDate <= '2023-12-20') ,lek.ApplicationScore/100 ,
-                               
-                               lek.BehaviourModel ))
+# Ensure DisbursedDate is a datetime object (if not already)
+lek['DisbursedDate'] = pd.to_datetime(lek['DisbursedDate'])
+
+# Convert the string to a datetime object
+comparison_date = pd.to_datetime('2023-12-20')
 
 
 
-lek['AppliedScore'] = np.where(  lek['AppliedScore'] > 0.744587 ,1.0 , lek['AppliedScore'])
+lek['AppliedApplicationScore'] = np.where(
+    (lek['DisbursedDate'] > comparison_date) &
+    (np.round(lek['PDScoreNew'], 2) <= np.round(lek['AdmissionModel'], 2)) &
+    (lek['PDScoreNew'].notna()), 
+    lek['PDScoreNew'],  
+
+    np.where(
+        (lek['DisbursedDate'] > comparison_date) &
+        
+        lek['PDScoreNew'].isna(),  
+        lek['AdmissionModel'],  
+
+        np.where(
+            (lek['DisbursedDate'] <= comparison_date), 
+            lek['ApplicationScore'] / 100,  
+            lek['AdmissionModel'] 
+        )
+    )
+)
+
+lek['AdjustedBehaviourScore'] = np.where(  lek['CurrentDelinquencyStatus'].isin([4,9]) ,1.0 , lek['BehaviourModel'])
 
 
-lek['Stageing'] = np.where( lek.AppliedScore <=  0.248860, 'Stage1',
-                    np.where( (lek.AppliedScore >  0.248860) & (lek.AppliedScore <=  0.744587), 'Stage2',
-                        np.where( (lek.AppliedScore >  0.744587) , 'Stage3','CheCCHCH'
-                                 
-                        )))
+
+
+
+
+see = lek.copy()
+
+
+see['AppliedApplicationScore'] = np.where(  see.AppliedApplicationScore.isna()   ,0 , see.AppliedApplicationScore )
+
+
+see['PD_Delta'] = see.AdjustedBehaviourScore - see.AppliedApplicationScore 
+
+
+see = see[see.MOB.notna()]   ## take away accounts that was closed last month
+
+see['PD_Delta'] = np.where(see['PD_Delta'].isna() , 0,see['PD_Delta'])
+
+see = see.sort_values(by='PD_Delta')
+
+
+see['FBE'] = np.where( (see.ForberanceIn12Months == 1) &  (see.CurrentDelinquencyStatus > 1) , 1,0)
+
+
+see['SICR'] = np.where((see.PD_Delta > 0.0675) | (see['FBE'] == 1), 1, 0)
+
+
 
 ## Apply a lifetime factor, this is based from UCBLANCO VINTAGE ANALYSIS, in lower risk but still high 20 % increase and on the rest it will be 10 % increase
 
-lek['AppliedScore'] = np.where( (lek['Stageing'] == 'Stage2') &(lek['AppliedScore'] < 0.50) , lek.AppliedScore * 1.2 , 
-                      np.where( (lek['Stageing'] == 'Stage2') &(lek['AppliedScore'] >= 0.50) , lek.AppliedScore * 1.1 ,   lek.AppliedScore )) ## Adding LifeTime Convertion to Stage 2 
+see['AdjustedBehaviourScore'] = np.where( (see['SICR'] == 1) &(see['AdjustedBehaviourScore'] < 0.50) , see.AdjustedBehaviourScore * 1.2 , 
+                      np.where( (see['SICR'] == 1) &(see['AdjustedBehaviourScore'] >= 0.50) , see.AdjustedBehaviourScore * 1.1 ,   see.AdjustedBehaviourScore )) ## Adding LifeTime Convertion to Stage 2 
 
 
-lek['AppliedScore'] = np.where( lek.AppliedScore > 1,1,lek.AppliedScore)
-
-
-
+see['AdjustedBehaviourScore'] = np.where( see.AdjustedBehaviourScore > 1,1,see.AdjustedBehaviourScore)
 
 
 
-###############  Get last months values   ###############
+see['Stageing'] = np.where(   (see['SICR'] == 0 ) 
+                           
+                           ,'Stage1',
+                           np.where(   see['AdjustedBehaviourScore'] == 1.0 ,'Stage3','Stage2'))
+
+
+see = see.drop_duplicates()
+
+
+# Merge lek with MacroInstrument on 'SnapshotDate' in lek and 'Date' in MacroInstrument
+see = pd.merge(see, MacroInstrument, left_on='SnapshotDate', right_on='Date', how='left')
+
+see['AdjustedBehaviourScore'] =  see['BehaviourModel'] * see['Instrument Rolling Mean']
+
+see['AdjustedBehaviourScore'] = np.where(  see['CurrentDelinquencyStatus'].isin([4,9]) ,1.0 , see['BehaviourModel'])
 
 
 
-save = lek[(lek.SnapshotDate == max(lek.SnapshotDate))]
-
-new = lek[(lek.SnapshotDate != max(lek.SnapshotDate))]
-new = new[(new.SnapshotDate == max(new.SnapshotDate))]
 
 
-new = new[['AccountNumber','AppliedScore','Stageing','SnapshotDate','Stage','CurrentAmount']]
+path = "/Users/andreasnilsson/Library/CloudStorage/OneDrive-Nstart/Skrivbordet/Repository Homes/Behavior_Scorecard-DATA-223/1. Data/Code Export"
+os.chdir(path)
 
-vaR = (len(new.columns)-1)*(-1)
+see.to_excel('ECL_Input.xlsx')
 
-# Get the list of column names
-columns = new.columns.tolist()
-
-# Select the last two column names
-last_two_columns = columns[vaR:]
-
-# Create a dictionary that maps the old column names to the new ones with '_1m' suffix
-rename_dict = {col: f"{col}_1m" for col in last_two_columns}
-
-# Rename the last two columns
-new_renamed = new.rename(columns=rename_dict)
-
-see = pd.merge(  save, new_renamed , on='AccountNumber',how='outer')
-
-see['PD_Delta'] = see.AppliedScore - see.AppliedScore_1m  
-
-s1 = see[see.Stageing == 'Stage1']
-s2 = see[see.Stageing == 'Stage2']
-
-see['SICR'] = np.where(  ((see.Stageing_1m == 'Stage1'  ) & (see['PD_Delta'] > (np.max(s1.AppliedScore) - np.min(s1.AppliedScore)))   ) , 1,
-                    
-              np.where(    see.AppliedScore    >   0.744587   ,1,
-              np.where(    see.Stageing != 'Stage1'   ,1, 
-                    
-                       0 )))               
-                 
-
-reporting = see[['AccountNumber','SnapshotDate','MOB','DisbursedDate','CurrentAmount','CurrentAmount_1m','AppliedScore','AppliedScore_1m','Stageing','Stageing_1m','PD_Delta','SICR']]
-
-
-
-reporting.to_excel('test.xlsx', index=False)
