@@ -10,7 +10,7 @@ warnings.filterwarnings('ignore')
 
 ################### GET PAYMENT DATA ##########################
 
-path = "/Users/andreasnilsson/Library/CloudStorage/OneDrive-Nstart/Skrivbordet/Repository Homes/Behavior_Scorecard-DATA-223/2. Code/Classes"
+path = "../2. Code/Classes"
 os.chdir(path)
 
 from Preprocessing_Application_N import DataPreprocessor
@@ -26,7 +26,7 @@ driver = '{ODBC Driver 17 for SQL Server}'  # This is an example for SQL Server,
 # Initialize DataPreprocessor with all required parameters, including the driver
 processor = DataPreprocessor(server, database, username, password, driver)
 
-path = "/Users/andreasnilsson/Library/CloudStorage/OneDrive-Nstart/Skrivbordet/Repository Homes/Behavior_Scorecard-DATA-223/1. Data/Loan Portfolio Deli.sql"
+path = "../1. Data/Loan Portfolio Deli.sql"
 
 
 df = processor.fetch_data_from_sql(path)
@@ -50,7 +50,7 @@ df = df[df.AccountStatus.isin(['OPEN','FROZEN','COLLECTION'])]
 ################### IMPORT MACRO INSTRUMENT DATA ##########################
 
 
-path = "/Users/andreasnilsson/Library/CloudStorage/OneDrive-Nstart/Skrivbordet/Repository Homes/Behavior_Scorecard-DATA-223/1. Data"
+path = "../1. Data"
 os.chdir(path)
 
 MacroInstrument = pd.read_excel('Macro_Instrument.xlsx')
@@ -117,8 +117,8 @@ BehaviourDone = pd_.copy()
 print('hej2')
 #######################         CALCULATE ADMISSION MODEL         ##################################
 
-main_path = "/Users/andreasnilsson/Library/CloudStorage/OneDrive-Nstart/Skrivbordet/Repository Homes/Admission-Scorecard-DATA-196/DATA/MA Correct join - APL CRB-MLP Today.sql"
-co_path = "/Users/andreasnilsson/Library/CloudStorage/OneDrive-Nstart/Skrivbordet/Repository Homes/Admission-Scorecard-DATA-196/DATA/CO Min score join - APL CBR MLP Today.sql"
+main_path = "../1. Data/MA Correct join - APL CRB-MLP Today.sql"
+co_path = "../1. Data/CO Min score join - APL CBR MLP Today.sql"
 
 preprocessor = DataPreprocessor(server, database, username, password,driver)
 final_df = preprocessor.process_data(main_path, co_path)
@@ -296,7 +296,7 @@ see['AdjustedBehaviourScore'] = np.where(  see['CurrentDelinquencyStatus'].isin(
 
 
 
-path = "/Users/andreasnilsson/Library/CloudStorage/OneDrive-Nstart/Skrivbordet/Repository Homes/Behavior_Scorecard-DATA-223/1. Data/Code Export"
+path = "../1. Data/Code Export"
 os.chdir(path)
 
 see.to_excel('ECL_Input.xlsx')
