@@ -2,6 +2,7 @@
 
 
 WITH
+
 LPM_less12M_Accounts AS (
 SELECT DISTINCT [AccountNumber]
      , max(mob) as max_mob               --,SnapshotDate
@@ -9,10 +10,27 @@ SELECT DISTINCT [AccountNumber]
     WHERE  mob <= 12 and  IsMonthEnd = 1 --and AccountNumber = '7129596'
     GROUP by AccountNumber   ),
 
+
+thirtyAtThree AS (
+SELECT DISTINCT [AccountNumber]
+     ,Ever30
+    FROM [Reporting-db].[nystart].[LoanPortfolioMonthly]
+    WHERE  mob = 3 and  IsMonthEnd = 1 --and AccountNumber = '7129596'
+      ),
+
+
+
+
 DEL90 AS (
-    SELECT DISTINCT L.AccountNumber ,L.Ever90 ,L.DisbursedDate ,L.MOB      --,SnapshotDate
+    SELECT DISTINCT L.AccountNumber ,T.Ever30 ,L.Ever90 ,L.DisbursedDate ,L.MOB      --,SnapshotDate
     FROM [Reporting-db].[nystart].[LoanPortfolioMonthly] as L
-    inner join LPM_less12M_Accounts as A on L.AccountNumber =A.AccountNumber and L.MOB = A.max_mob ) ,
+    inner join LPM_less12M_Accounts as A on L.AccountNumber =A.AccountNumber and L.MOB = A.max_mob  
+
+    inner join thirtyAtThree as T on L.AccountNumber =T.AccountNumber  ) 
+    
+    
+    
+    ,
 
 
 
@@ -20,9 +38,10 @@ DEL90 AS (
 
 DEL90_Applications_MaxDate AS (
     SELECT 
-        
+
+        D.Ever30,
         D.Ever90,
-        D.AccountNumber,
+        A.AccountNumber,
         A.ApplicationID,
         A.[SSN] as SSN_A,
         A.PDScoreNew,
@@ -34,6 +53,7 @@ DEL90_Applications_MaxDate AS (
         A.[ReceivedDate],
         A.[DisbursedDate],
         A.[Amount],
+        A.InterestRate,
         A.[StartupFee],
         --A.[UCScore],
         A.[PaymentRemarks],
@@ -70,7 +90,7 @@ DEL90_Applications_MaxDate AS (
 
     FROM 
         [Reporting-db].[nystart].[Applications] as A
-    INNER JOIN DEL90 D ON A.AccountNumber = D.AccountNumber  and A.DisbursedDate =  D.DisbursedDate
+    FULL JOIN DEL90 D ON A.AccountNumber = D.AccountNumber  and A.DisbursedDate =  D.DisbursedDate
 
     where IsMainApplicant = 1 and HasCoapp = 0  and A.[Status] = 'DISBURSED' 
 
@@ -203,5 +223,7 @@ LEFT JOIN [Reporting-db].[nystart].[CreditReportsBase] CBR ON CBR.SSN = DA.SSN_A
 select * from main 
 
 where RowNumber = 1 --and Ever90 = 1
+
+--and SSN = '915E4B2F51E180C728D3DEF7074DE8B0B298531C1E0DF5557BC754C40C7A1ACF93AAD124DC38E2A7BE7C96ECF45B7180F2AA79B25A27945D59C979C6D4839669'
 
  --and SSN_A = '915E4B2F51E180C728D3DEF7074DE8B0B298531C1E0DF5557BC754C40C7A1ACF93AAD124DC38E2A7BE7C96ECF45B7180F2AA79B25A27945D59C979C6D4839669'
