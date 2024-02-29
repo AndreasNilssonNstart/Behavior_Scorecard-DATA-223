@@ -26,7 +26,7 @@ driver = '{ODBC Driver 17 for SQL Server}'  # This is an example for SQL Server,
 # Initialize DataPreprocessor with all required parameters, including the driver
 processor = DataPreprocessor(server, database, username, password, driver)
 
-path = "../1. Data/Loan Portfolio Deli.sql"
+path = "../../1. Data/Loan Portfolio Deli.sql"
 
 
 df = processor.fetch_data_from_sql(path)
