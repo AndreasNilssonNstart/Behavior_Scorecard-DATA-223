@@ -44,7 +44,6 @@ select *,
 	   Min(case when Delinquency>4 then  SnapshotDate else null end) over (partition by SSN order by SnapshotDate rows between 1 following and unbounded following) as Next120Date,
 	   Min(case when Delinquency=9 then  SnapshotDate else null end) over (partition by SSN order by SnapshotDate rows between 1 following and unbounded following) as NextFrozenDate,
 	   Min(case when FBE=1 then SnapshotDate else null end) over (partition by SSN order by SnapshotDate rows between 1 following and unbounded following) as NextFBEDate  --
-​
 
 from DelinquencyInfo ) 
 
@@ -153,8 +152,7 @@ from deliFinal1 d1
 left join deli1 d90 on  d1.SSN=d90.SSN and d90.SnapshotDate=d1.Next90Date
 left join deli1 d120 on  d1.SSN=d120.SSN and d120.SnapshotDate=d1.Next120Date
 
-
-​) 
+)
 ,
 
 base1	as (

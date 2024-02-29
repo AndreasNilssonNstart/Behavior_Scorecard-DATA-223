@@ -2,7 +2,8 @@ import pandas as pd
 import numpy as np
 import datetime as dt
 import os
-
+import sqlalchemy as sa
+import pyodbc
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -10,7 +11,7 @@ warnings.filterwarnings('ignore')
 
 ################### GET PAYMENT DATA ##########################
 
-path = "../2. Code/Classes"
+path = "Classes"
 os.chdir(path)
 
 from Preprocessing_Application_N import DataPreprocessor
@@ -22,6 +23,10 @@ database = 'reporting-db'
 username = 'Andreas'
 password = 'nCq8Sg@1lYnd(E'
 driver = '{ODBC Driver 17 for SQL Server}'  # This is an example for SQL Server, adjust according to your database and installed ODBC driver
+
+
+
+engine = sa.create_engine('mssql+pyodbc://'+username+':'+password+'@'+server+':1433/'+database+'?driver=SQL+Server+Native+Client+11.0')
 
 # Initialize DataPreprocessor with all required parameters, including the driver
 processor = DataPreprocessor(server, database, username, password, driver)
@@ -50,7 +55,7 @@ df = df[df.AccountStatus.isin(['OPEN','FROZEN','COLLECTION'])]
 ################### IMPORT MACRO INSTRUMENT DATA ##########################
 
 
-path = "../1. Data"
+path = "../../1. Data"
 os.chdir(path)
 
 MacroInstrument = pd.read_excel('Macro_Instrument.xlsx')
@@ -124,7 +129,9 @@ preprocessor = DataPreprocessor(server, database, username, password,driver)
 final_df = preprocessor.process_data(main_path, co_path)
 
 
-pd_ = final_df[['SSN','PDScoreNew','UCScore','age' ,'Inquiries12M','UtilizationRatio','Amount','MaritalStatus','ReceivedDate','DisbursedDate','Applicationtype','Ever90','Ever30','AccountNumber','CapitalDeficit','PropertyVolume','PaymentRemarks','IndebtednessRatio','ApplicationScore', 'StartupFee','PaymentRemarksNo'] ]
+pd_ = final_df[['SSN','PDScoreNew','UCScore','age' ,'Inquiries12M','UtilizationRatio','Amount','MaritalStatus','ReceivedDate','DisbursedDate','Applicationtype','Ever90',
+                'Ever30',
+                'AccountNumber','CapitalDeficit','PropertyVolume','PaymentRemarks','IndebtednessRatio','ApplicationScore', 'StartupFee','PaymentRemarksNo'] ]
 
 
 
@@ -293,11 +300,9 @@ see['AdjustedBehaviourScore'] =  see['BehaviourModel'] * see['Instrument Rolling
 see['AdjustedBehaviourScore'] = np.where(  see['CurrentDelinquencyStatus'].isin([4,9]) ,1.0 , see['BehaviourModel'])
 
 
+see.to_sql('ECLInput', con=engine, index=False, if_exists='replace', schema='nystart')
+#path = "Code Export"
+#os.chdir(path)
 
-
-
-path = "../1. Data/Code Export"
-os.chdir(path)
-
-see.to_excel('ECL_Input.xlsx')
+#see.to_excel('ECL_Input.xlsx')
 
