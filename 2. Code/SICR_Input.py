@@ -26,14 +26,6 @@ password = 'Tnb1tr9SNUgpJhQAc1lt'
 driver = '{ODBC Driver 17 for SQL Server}'  # This is an example for SQL Server, adjust according to your database and installed ODBC driver
 
 
-params = urllib.parse.quote_plus("'DRIVER={ODBC Driver 17 for SQL Server};SERVER='+server+';DATABASE='+database+';UID='+username+';PWD='+ password")
-engine = sa.create_engine('mssql+pyodbc://'+username+':'+password+'@'+server+':1433/'+database+'?driver=SQL+Server+Native+Client+11.0')
-lst = ['Java', 'Python', 'C', 'C++',  
-         'JavaScript', 'Swift', 'Go']  
-df=pd.DataFrame(lst)
-
-df.to_sql('ECLInput', con=engine, index=False, if_exists='replace', schema='nystart')
-quit()
 # Initialize DataPreprocessor with all required parameters, including the driver
 processor = DataPreprocessor(server, database, username, password, driver)
 
@@ -305,10 +297,8 @@ see['AdjustedBehaviourScore'] =  see['BehaviourModel'] * see['Instrument Rolling
 
 see['AdjustedBehaviourScore'] = np.where(  see['CurrentDelinquencyStatus'].isin([4,9]) ,1.0 , see['BehaviourModel'])
 
-params = urllib.parse.quote_plus("'DRIVER={ODBC Driver 17 for SQL Server};SERVER='+server+';DATABASE='+database+';UID='+username+';PWD='+ password")
-engine = sa.create_engine("mssql+pyodbc:///?odbc_connect=%s" % params)
-
-see.to_sql('ECLInput', con=engine, index=False, if_exists='replace', schema='nystart')
+engine = sa.create_engine('mssql+pyodbc://'+username+':'+password+'@'+server+':1433/'+database+'?driver=SQL+Server+Native+Client+11.0')
+df.to_sql('ECLInput', con=engine, index=False, if_exists='replace', schema='nystart')
 #path = "Code Export"
 #os.chdir(path)
 
