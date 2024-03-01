@@ -298,7 +298,7 @@ see['AdjustedBehaviourScore'] =  see['BehaviourModel'] * see['Instrument Rolling
 see['AdjustedBehaviourScore'] = np.where(  see['CurrentDelinquencyStatus'].isin([4,9]) ,1.0 , see['BehaviourModel'])
 
 engine = sa.create_engine('mssql+pyodbc://'+username+':'+password+'@'+server+':1433/'+database+'?driver=SQL+Server+Native+Client+11.0')
-df.to_sql('ECLInput', con=engine, index=False, if_exists='replace', schema='nystart')
+see.to_sql('ECLInput', con=engine, index=False, if_exists='replace', schema='nystart')
 #path = "Code Export"
 #os.chdir(path)
 
