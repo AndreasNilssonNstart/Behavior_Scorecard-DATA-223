@@ -21,7 +21,7 @@ WITH  DelinquencyInfo AS
     LEFT JOIN nystart.PaymentFreeMonths PFM ON LP.AccountNumber = PFM.AccountNumber 
                                              AND YEAR(LP.SnapshotDate) * 100 + MONTH(LP.SnapshotDate) = PFM.YearMonth
     LEFT JOIN nystart.DateDim DD ON LP.SnapshotDate = DD.Date
-    WHERE LP.SnapshotDate > DATEADD(MONTH, -12, GETDATE())    --and LP.AccountNumber =7798630
+    WHERE LP.SnapshotDate > DATEADD(MONTH, -9, GETDATE())    --and LP.AccountNumber =7798630
     GROUP BY LP.SnapshotDate, A.SSN, DD.IsMonthEnd
 ),
 
