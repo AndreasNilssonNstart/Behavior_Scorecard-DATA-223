@@ -20,7 +20,7 @@ WITH DelinquencyInfo AS
                                              AND YEAR(LP.SnapshotDate) * 100 + MONTH(LP.SnapshotDate) = PFM.YearMonth
     WHERE LP.SnapshotDate > DATEADD(MONTH, -3, GETDATE())
 
-          --AND LP.AccountNumber = 5000609 --in (5458583 , 5401138 ,5058573) 
+          --AND LP.AccountNumber = 7700172 --in (5458583 , 5401138 ,5058573) 
 
           -- Ensure SnapshotDate is the last day of its month by checking if adding one day shifts to a new month
           AND DATEADD(DAY, 1, LP.SnapshotDate) = DATEADD(MONTH, DATEDIFF(MONTH, 0, LP.SnapshotDate) + 1, 0)
@@ -261,7 +261,7 @@ LatestStatus AS (
     FROM 
         [Reporting-db].[nystart].[Forbearance]
     WHERE 
-        ForbearanceName NOT IN ('Skip a pay', '')
+        ForbearanceName  IN ('Permanent interest cut', 'Extension of maturity','Temporary interest cut','Capitalization')
     GROUP BY 
         AccountNumber
 )
@@ -269,14 +269,14 @@ LatestStatus AS (
 
 LatestForberanceStatus as (
 
-SELECT f.AccountNumber, f.StartDate as forberanceDate
+SELECT f.AccountNumber, f.StartDate as forberanceDate , ForbearanceName ,f.StartDate ,f.EndDate
 
 FROM 
     [Reporting-db].[nystart].[Forbearance] AS f
 INNER JOIN 
     LatestStatus AS l ON f.AccountNumber = l.AccountNumber AND f.StartDate = l.LastStartDate
 WHERE 
-    f.ForbearanceName NOT IN ('Skip a pay', '')
+    f.ForbearanceName  IN ('Permanent interest cut', 'Extension of maturity','Temporary interest cut','Capitalization')
 
 ) , 
 
@@ -284,7 +284,12 @@ ForberanceLogic as (
 
 SELECT b.*, 
        l.forberanceDate,
-       CASE WHEN DATEADD(month, 3, l.forberanceDate) > b.SnapshotDate AND b.SnapshotDate >= l.forberanceDate THEN 1 ELSE 0 END as ForberanceIn3Months,
+           CASE
+        WHEN (b.SnapshotDate BETWEEN l.StartDate AND l.EndDate)  and (b.WorstDelinquency <4)  then 1 -- or another value indicating true
+        ELSE 0 -- or another value indicating false
+    END AS FBE_eftergift
+
+       ,CASE WHEN DATEADD(month, 3, l.forberanceDate) > b.SnapshotDate AND b.SnapshotDate >= l.forberanceDate THEN 1 ELSE 0 END as ForberanceIn3Months,
        CASE WHEN DATEADD(month, 6, l.forberanceDate) > b.SnapshotDate AND b.SnapshotDate >= l.forberanceDate THEN 1 ELSE 0 END as ForberanceIn6Months,
        CASE WHEN DATEADD(month, 9, l.forberanceDate) > b.SnapshotDate AND b.SnapshotDate >= l.forberanceDate THEN 1 ELSE 0 END as ForberanceIn9Months,
        CASE WHEN DATEADD(month, 12, l.forberanceDate) > b.SnapshotDate AND b.SnapshotDate >= l.forberanceDate THEN 1 ELSE 0 END as ForberanceIn12Months
@@ -294,16 +299,31 @@ LEFT JOIN LatestForberanceStatus as l ON b.AccountNumber = l.AccountNumber
 )
 
 
+
+
+
+
+
 select distinct  b.*,cs.Score,cs.RiskClass
 
 from ForberanceLogic b
 left join nystart.CustomerScore cs on cs.AccountNumber=b.AccountNumber and cs.SnapshotDate=b.SnapshotDate
 
---WHERE b.AccountNumber = 5058573
+--WHERE b.AccountNumber = 7700172
+
+--where FBE_eftergift <> 0
 
 order by b.CoappFlag , b.MOB
 
 
 
+
+
+
+
+
+
+
+--SELECT distinct ForbearanceName from [Reporting-db].[nystart].[Forbearance] -- where AccountNumber = '7701410'
 
 

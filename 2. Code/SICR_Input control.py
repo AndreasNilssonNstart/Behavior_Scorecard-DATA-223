@@ -17,7 +17,6 @@ os.chdir(path)
 
 from Preprocessing_Application_N import DataPreprocessor
 
-print('hej')
 
 
 server = 'reporting-db.nystartfinans.net'
@@ -55,7 +54,19 @@ df = pd.concat([main,co])
 df = df[df.AccountStatus.isin(['OPEN','FROZEN','COLLECTION'])]
 
 
+## The co - applicant data can make duplicates make sure the forbreance data does not become duplicated
 
+FBE_ = df[df.FBE_eftergift == 1]
+FBE_no = df[df.FBE_eftergift == 0]
+
+# Step 2: Remove rows from FBE_no that have identical 'SnapshotDate' and 'AccountNumber' in FBE_
+# Create a Boolean Series to identify rows to keep in FBE_no
+mask = ~FBE_no[['SnapshotDate', 'AccountNumber']].apply(tuple, 1).isin(FBE_[['SnapshotDate', 'AccountNumber']].apply(tuple, 1))
+# Apply the mask to filter FBE_no
+FBE_no_filtered = FBE_no[mask]
+
+# Step 3: Concatenate FBE_ and FBE_no_filtered into a new DataFrame
+df = pd.concat([FBE_, FBE_no_filtered])
 
 
 ################### IMPORT MACRO INSTRUMENT DATA ##########################
@@ -116,7 +127,7 @@ pd_['Z_calibrated'] = pd_['P'].apply(lambda x: x * calibration_coef + calibratio
 pd_['BehaviourModel'] = pd_['Z_calibrated'].apply(lambda x: 1 / (1 + np.exp(-x)))
 
 
-pd_ = pd_[['AccountNumber','AccountStatus','SnapshotDate',	'MOB'	,'DisbursedDate',	'CurrentAmount','RemainingTenor','CoappFlag',	'Ever30In6Months',	'WorstDelinquency6M','CurrentDelinquencyStatus','WorstDelinquency12M','Ever30In12Months','Ever90In12Months'	,'Score'	,'RiskClass','P','BehaviourModel','Ever90','ForberanceIn6Months','ForberanceIn12Months']]
+pd_ = pd_[['AccountNumber','AccountStatus','SnapshotDate',	'MOB'	,'DisbursedDate',	'CurrentAmount','RemainingTenor','CoappFlag',	'Ever30In6Months',	'WorstDelinquency6M','CurrentDelinquencyStatus','WorstDelinquency12M','Ever30In12Months','Ever90In12Months'	,'Score'	,'RiskClass','P','BehaviourModel','Ever90','ForberanceIn6Months','ForberanceIn12Months','FBE_eftergift']]
 pd_.loc[:, 'DisbursedDate'] = pd.to_datetime(pd_['DisbursedDate'])
 
 
@@ -126,7 +137,6 @@ BehaviourDone = pd_.copy()
 
 
 
-print('hej2')
 #######################         CALCULATE ADMISSION MODEL         ##################################
 
 main_path = "../1. Data/MA Correct join - APL CRB-MLP Today.sql"
@@ -164,7 +174,6 @@ print(pd_['DisbursedDate'].max())
 
 
 
-print('hej3')
 
 
 # Coefficients and Intercept from the Logistic Regression model
@@ -202,11 +211,7 @@ pd_['AdmissionModel'] = pd_['Z_calibrated'].apply(lambda x: 1 / (1 + np.exp(-x))
 AdmissionDone = pd_[['AccountNumber','PDScoreNew','UCScore','age','Inquiries12M','PropertyVolume','AdmissionModel','ApplicationScore']]
 AdmissionDone['AccountNumber'] = AdmissionDone['AccountNumber'] #.astype(int)
 
-print(type(AdmissionDone['AccountNumber']))
-print(type(BehaviourDone['AccountNumber']))
 
-
-print('hej4')
 #######################         CREATE SICR LOGIC         ##################################
 
 
@@ -272,10 +277,19 @@ see['PD_Delta'] = np.where(see['PD_Delta'].isna() , 0,see['PD_Delta'])
 see = see.sort_values(by='PD_Delta')
 
 
-see['FBE'] = np.where( (see.ForberanceIn12Months == 1) &  (see.CurrentDelinquencyStatus > 1) , 1,0)
+
+see['FBE'] = np.where(
+    (see['ForberanceIn12Months'] == 1) & (see['CurrentDelinquencyStatus'] > 1) & (see['CurrentDelinquencyStatus'] < 4),
+    'monitoring_previous_S3',
+    np.where(
+        see['FBE_eftergift'] == 1,
+        'monitoring_paymentrelief',
+        ''
+    )
+)
 
 
-see['SICR'] = np.where((see.PD_Delta > 0.0675) | (see['FBE'] == 1), 1, 0)
+see['SICR'] = np.where((see.PD_Delta > 0.0675) | (see['FBE'] != ''), 1, 0)
 
 
 
@@ -304,6 +318,8 @@ see = pd.merge(see, MacroInstrument, left_on='SnapshotDate', right_on='Date', ho
 see['AdjustedBehaviourScore'] =  see['BehaviourModel'] * see['Instrument Rolling Mean']
 
 see['AdjustedBehaviourScore'] = np.where(  see['CurrentDelinquencyStatus'].isin([4,9]) ,1.0 , see['BehaviourModel'])
+
+
 
 # Update the driver to 'ODBC Driver 17 for SQL Server' for Native Client 17
 # This assumes you're using ODBC Driver 17, which is the usual driver used with SQL Server Native Client 17 installations
