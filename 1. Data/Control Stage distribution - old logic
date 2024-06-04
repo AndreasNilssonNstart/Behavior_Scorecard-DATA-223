@@ -1,0 +1,96 @@
+-- SELECT [AccountNumber]
+--       ,[SnapshotDate]
+--       ,[MOB]
+--       ,[AppliedApplicationScore]
+--       ,[AdjustedBehaviourScore]
+--       ,[PD_Delta]
+--       ,[FBE]
+--       ,[SICR]
+--       ,[Stageing]
+--   FROM [reporting-db].[nystart].[CustomerScores]
+
+
+
+
+with  score as (
+
+SELECT 
+    [AccountNumber]
+      ,[SnapshotDate]
+      ,[MOB]
+      ,[AppliedApplicationScore]
+      ,[AdjustedBehaviourScore]
+      ,[PD_Delta]
+      ,[FBE]
+      ,[SICR]
+      ,[Stageing]
+  FROM [reporting-db].[nystart].[CustomerScores]
+
+),
+
+-- with score as (SELECT
+
+-- * from nystart.CustomerScore
+
+--  WHERE SnapshotDate > DATEADD(MONTH, -3, GETDATE())
+
+--     -- Ensure SnapshotDate is the last day of its month by checking if adding one day shifts to a new month
+--     AND DATEADD(DAY, 1, SnapshotDate) = DATEADD(MONTH, DATEDIFF(MONTH, 0, SnapshotDate) + 1, 0)
+
+-- ),
+
+ balance AS 
+(
+    SELECT DISTINCT
+        LP.SnapshotDate,
+        LP.AccountNumber,
+
+        LP.CurrentAmount
+
+    FROM nystart.LoanPortfolio LP
+
+    WHERE LP.SnapshotDate > DATEADD(MONTH, -3, GETDATE())
+
+          --AND LP.AccountNumber = 7700172 --in (5458583 , 5401138 ,5058573) 
+
+          -- Ensure SnapshotDate is the last day of its month by checking if adding one day shifts to a new month
+          AND DATEADD(DAY, 1, LP.SnapshotDate) = DATEADD(MONTH, DATEDIFF(MONTH, 0, LP.SnapshotDate) + 1, 0)
+
+          and LP.CurrentAmount > 0
+
+          --and LP.SnapshotDate = '2024-03-31'
+
+          and lp.IsOpen = 1
+ 
+)
+
+,toghether as (
+
+SELECT 
+
+s.*,
+b.CurrentAmount 
+
+from score as s 
+
+left join balance as b on s.AccountNumber = b.AccountNumber and s.SnapshotDate = b.SnapshotDate
+)
+
+SELECT SnapshotDate, Stageing, sum(CurrentAmount) as sum  from toghether
+
+
+
+group by SnapshotDate ,Stageing
+
+order by SnapshotDate ,Stageing
+
+
+
+
+
+--delete    FROM [reporting-db].[nystart].[CustomerScores] where SnapshotDate = '2024-04-30'
+
+
+-- Select top (1000) * from nystart.CustomerScore
+
+

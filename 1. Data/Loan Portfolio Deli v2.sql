@@ -18,15 +18,14 @@ WITH DelinquencyInfo AS
     LEFT JOIN nystart.Applications A ON A.AccountNumber = LP.AccountNumber AND A.DisbursedDate = LP.DisbursedDate
     LEFT JOIN nystart.PaymentFreeMonths PFM ON LP.AccountNumber = PFM.AccountNumber 
                                              AND YEAR(LP.SnapshotDate) * 100 + MONTH(LP.SnapshotDate) = PFM.YearMonth
-    WHERE LP.SnapshotDate > DATEADD(MONTH, -3, GETDATE())
+    WHERE LP.SnapshotDate > DATEADD(MONTH, -1, GETDATE())
 
-          --AND LP.AccountNumber = 7700172 --in (5458583 , 5401138 ,5058573) 
+          --AND LP.AccountNumber = 7165236 -- 5777172
 
           -- Ensure SnapshotDate is the last day of its month by checking if adding one day shifts to a new month
           AND DATEADD(DAY, 1, LP.SnapshotDate) = DATEADD(MONTH, DATEDIFF(MONTH, 0, LP.SnapshotDate) + 1, 0)
     GROUP BY LP.SnapshotDate, LP.AccountNumber
 )
-
 
 
 ,
@@ -167,6 +166,7 @@ base1   as (
 select  LP.SnapshotDate,
 
        LP.AccountNumber,
+       LP.IsOpen,
        case when LP.IsOpen=1 and DelinquencyStatus='Frozen' then 'FROZEN'
             when LP.IsOpen=1 and DelinquencyStatus<>'Frozen' then 'OPEN'
             else 'CLOSED'
@@ -264,8 +264,7 @@ LatestStatus AS (
         ForbearanceName  IN ('Permanent interest cut', 'Extension of maturity','Temporary interest cut','Capitalization')
     GROUP BY 
         AccountNumber
-)
-,
+),
 
 LatestForberanceStatus as (
 
@@ -298,32 +297,15 @@ LEFT JOIN LatestForberanceStatus as l ON b.AccountNumber = l.AccountNumber
 
 )
 
+,allt as ( SELECT
 
-
-
-
-
-
-select distinct  b.*,cs.Score,cs.RiskClass
+ distinct  b.*  --,cs.Score,cs.RiskClass ,cs.Stage
 
 from ForberanceLogic b
-left join nystart.CustomerScore cs on cs.AccountNumber=b.AccountNumber and cs.SnapshotDate=b.SnapshotDate
+--left join nystart.CustomerScore cs on cs.AccountNumber=b.AccountNumber and cs.SnapshotDate=b.SnapshotDate)
+)
 
---WHERE b.AccountNumber = 7700172
+SELECT * from allt
 
---where FBE_eftergift <> 0
-
-order by b.CoappFlag , b.MOB
-
-
-
-
-
-
-
-
-
-
---SELECT distinct ForbearanceName from [Reporting-db].[nystart].[Forbearance] -- where AccountNumber = '7701410'
-
+order by SnapshotDate
 
