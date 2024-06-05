@@ -1,0 +1,56 @@
+
+
+
+
+with one as (
+
+SELECT distinct BrokerName 
+
+from nystart.Applications where Product = 'Nylån' and BrokerName not in ('Enklare','Advisa','None')
+
+),  
+
+both as (
+
+SELECT b.*
+
+  FROM [reporting-db].[nystart].[BrokerCommissionSetup] as b 
+  inner join one as o  on b.BrokerName = o.BrokerName
+
+)
+
+
+insert into nystart.BrokerCommissionSetup
+
+SELECT 
+
+
+ [BrokerName]
+      ,[Days]
+      ,[Months]
+      ,[CommissionPct]
+      ,[ChurnDeduction]
+      ,[AmortDeduction]
+      ,[AmountFrom]
+      ,[AmountTo]
+      ,[validTo]
+      ,[validFrom]
+      ,[FixAmount]
+      ,[PrevToAmount]
+      ,'Nylån' as Product
+      
+       from both
+
+       where ((BrokerName <> 'Reducero') or (BrokerName = 'Reducero' and CommissionPct = 0.03))
+
+        and GETDATE() between validFrom and validTo
+
+
+
+-- SELECT distinct BrokerName 
+
+-- from nystart.Applications where Product = 'Nylån' and BrokerName not in ('Enklare','Advisa','None')
+
+
+
+
